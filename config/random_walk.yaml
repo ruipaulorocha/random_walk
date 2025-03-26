@@ -1,0 +1,10 @@
+/**: # any namespace
+ random_walk:
+   ros__parameters:
+      # Pioneer 3 DX robot (tested on real robot with a Hokuyo LRF)
+      linear_speed:         0.6
+      angular_speed:        1.0
+      safe_distance_th:     1.0
+      critical_distance_th: 0.4
+      alpha:                0.3
+      max_delta_yaw:        10

@@ -41,6 +41,7 @@
 #include <geometry_msgs/msg/twist_stamped.hpp>	// twist messages with timestamp
 #include <stdlib.h>
 #include <chrono>
+#include <limits>
 
 #define GO_STRAIGHT 	0
 #define ADJUST_YAW		1
@@ -140,35 +141,35 @@ CRandomWalk::CRandomWalk(): Node("random_walk"){
 
 
 double CRandomWalk::min_distance_to_obstacles(const sensor_msgs::msg::LaserScan &scan, double &angle_min_distance){
-	// consider all readings
-	// double min_dist = scan.ranges[0];
-	// double angle = scan.angle_min;
-	// angle_min_distance = angle;
-
-	// for (long unsigned int k = 1; k < scan.ranges.size(); ++k){ // start comparing as of 2nd reading
-	// 	angle += scan.angle_increment;
-	// 	if (min_dist > scan.ranges[k]){
-	// 		min_dist = scan.ranges[k];
-	// 		angle_min_distance = angle;
-	// 	}
-	// }
-
-	// consider only readings between angles -PI/2 and +PI/2
-	double k_floating = (-M_PI/2.0 - scan.angle_min) / scan.angle_increment;
-	long unsigned int k = (unsigned long int) k_floating;
-	if ( ((double) k) != k_floating) ++k;
-	double angle = scan.angle_min + k * scan.angle_increment;
-	double min_dist = scan.ranges[k];
+	// to consider only readings between angles -PI/2 and +PI/2
+	//double k_floating = (-M_PI/2.0 - scan.angle_min) / scan.angle_increment;
+	//long unsigned int k = (unsigned long int) k_floating;
+	//if ( ((double) k) != k_floating) ++k;
+	double angle = scan.angle_min; //scan.angle_min + k * scan.angle_increment;
+	double min_dist = std::numeric_limits<double>::max();
 	angle_min_distance = angle;
+	double previous_range = min_dist;
 
-	for (k = k + 1; k < scan.ranges.size() && angle <= M_PI/2.0; ++k){
-		angle += scan.angle_increment;	
-		if (min_dist > scan.ranges[k]){
+	// constants to avoid outliers in laser scan
+	const double max_range_variation_within_cluster = 0.1;
+	const double epsilon = 0.05;
+
+	//for (; k < scan.ranges.size() && angle <= M_PI/2.0; ++k){
+	for (long unsigned int k = 0; k < scan.ranges.size(); ++k){	
+		if (!std::isnan(scan.ranges[k]) && scan.ranges[k] > epsilon &&
+			fabs(previous_range - scan.ranges[k]) < max_range_variation_within_cluster &&
+			min_dist > scan.ranges[k])
+		{
 			min_dist = scan.ranges[k];
 			angle_min_distance = angle;
 		}
+		previous_range = scan.ranges[k];
+		angle += scan.angle_increment;
 	}
 
+	RCLCPP_DEBUG_STREAM(this->get_logger(),
+		"min_dist = " << min_dist << ", angle_min_distance = " << angle_min_distance
+		);
 	return min_dist;
 }
 
