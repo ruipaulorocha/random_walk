@@ -37,5 +37,6 @@ The package `random_walk` contains a node that makes a differential drive mobile
     - degrees
 - `lidar_yaw_offset` (double, default: 0.0)
     - Rotation angle about zz axis of the `laser` frame w.r.t. the `base_link` frame
+    - degrees
 - `stamped` (boolean, default: false)
     - Whether to publish stamped twist messages
