@@ -199,10 +199,6 @@ void CRandomWalk::scan_callback(const sensor_msgs::msg::LaserScan &scan){
 				publish_twist(twist);
 				end_time = this->get_clock()->now() + 
 					motionTimePredict(rndAngle(max_delta_yaw));
-				RCLCPP_INFO_STREAM(this->get_logger(),
-					"COMPUTE ROTATION DIRECTION: min_dist = " << min_dist <<
-					", angle_min_distance = " << angle_min_distance
-				);
 			}
 			break;
 		case ADJUST_YAW:
