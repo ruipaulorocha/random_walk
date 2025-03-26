@@ -57,6 +57,7 @@ private:
 	double critical_distance_th;
 	double alpha;
 	int max_delta_yaw;
+	double lidar_yaw_offset;
 	bool stamped;
 
 	// other attributes
@@ -68,7 +69,8 @@ private:
 	rclcpp::Time end_time;
 
 	// private methods
-	double min_distance_to_obstacles(const sensor_msgs::msg::LaserScan &scan, double &angle_min_distance);
+	double min_distance_to_obstacles(const sensor_msgs::msg::LaserScan &scan,
+		double &angle_min_distance);
 	void publish_twist(const geometry_msgs::msg::Twist &);
 	void scan_callback(const sensor_msgs::msg::LaserScan &);
 	rclcpp::Duration motionTimePredict(double) const;
@@ -90,6 +92,7 @@ CRandomWalk::CRandomWalk(): Node("random_walk"){
 	this->declare_parameter("critical_distance_th",	0.25);
 	this->declare_parameter("alpha",				0.25);
 	this->declare_parameter("max_delta_yaw",		180);
+	this->declare_parameter("lidar_yaw_offset",		0.0);
 	this->declare_parameter("stamped",				false);
 
 	// get parameter values
@@ -99,6 +102,7 @@ CRandomWalk::CRandomWalk(): Node("random_walk"){
 	critical_distance_th =	this->get_parameter("critical_distance_th").as_double();
 	alpha =					this->get_parameter("alpha").as_double();
 	max_delta_yaw =			this->get_parameter("max_delta_yaw").as_int();
+	lidar_yaw_offset = 		this->get_parameter("lidar_yaw_offset").as_double();
 	stamped =				this->get_parameter("stamped").as_bool();
 
 	if (alpha > 1.0) alpha = 1.0;
@@ -112,8 +116,9 @@ CRandomWalk::CRandomWalk(): Node("random_walk"){
 		"linear_speed = " << linear_speed << ", angular_speed = " << angular_speed <<
 		", safe_distance_th = " << safe_distance_th << ", critical_distance_th = " << critical_distance_th <<
 		", alpha = " << alpha << ", max_delta_yaw = " << max_delta_yaw <<
-		", stamped = " << (stamped?"True":"False")
+		", lidar_yaw_offset = " << lidar_yaw_offset << ", stamped = " << (stamped?"True":"False")
 	);
+	lidar_yaw_offset *= M_PI/180.0; // convert offset to radians
 
 	// subscriber
 	laser_sub = this->create_subscription<sensor_msgs::msg::LaserScan>("scan",
@@ -140,12 +145,14 @@ CRandomWalk::CRandomWalk(): Node("random_walk"){
 }
 
 
-double CRandomWalk::min_distance_to_obstacles(const sensor_msgs::msg::LaserScan &scan, double &angle_min_distance){
-	// to consider only readings between angles -PI/2 and +PI/2
-	//double k_floating = (-M_PI/2.0 - scan.angle_min) / scan.angle_increment;
-	//long unsigned int k = (unsigned long int) k_floating;
-	//if ( ((double) k) != k_floating) ++k;
-	double angle = scan.angle_min; //scan.angle_min + k * scan.angle_increment;
+double CRandomWalk::min_distance_to_obstacles(const sensor_msgs::msg::LaserScan &scan,
+		double &angle_min_distance){
+	// consider only readings between angles -PI/2 and +PI/2
+	double angle_1st_reading = scan.angle_min + lidar_yaw_offset;
+	double k_floating = (-M_PI/2.0 - angle_1st_reading) / scan.angle_increment;
+	long unsigned int k = (unsigned long int) k_floating;
+	if ( ((double) k) != k_floating) ++k;
+	double angle = angle_1st_reading + k * scan.angle_increment;
 	double min_dist = std::numeric_limits<double>::max();
 	angle_min_distance = angle;
 	double previous_range = min_dist;
@@ -154,8 +161,7 @@ double CRandomWalk::min_distance_to_obstacles(const sensor_msgs::msg::LaserScan 
 	const double max_range_variation_within_cluster = 0.1;
 	const double epsilon = 0.05;
 
-	//for (; k < scan.ranges.size() && angle <= M_PI/2.0; ++k){
-	for (long unsigned int k = 0; k < scan.ranges.size(); ++k){	
+	for (; k < scan.ranges.size() && angle <= M_PI/2.0; ++k){
 		if (!std::isnan(scan.ranges[k]) && scan.ranges[k] > epsilon &&
 			fabs(previous_range - scan.ranges[k]) < max_range_variation_within_cluster &&
 			min_dist > scan.ranges[k])
@@ -193,6 +199,10 @@ void CRandomWalk::scan_callback(const sensor_msgs::msg::LaserScan &scan){
 				publish_twist(twist);
 				end_time = this->get_clock()->now() + 
 					motionTimePredict(rndAngle(max_delta_yaw));
+				RCLCPP_INFO_STREAM(this->get_logger(),
+					"COMPUTE ROTATION DIRECTION: min_dist = " << min_dist <<
+					", angle_min_distance = " << angle_min_distance
+				);
 			}
 			break;
 		case ADJUST_YAW:
