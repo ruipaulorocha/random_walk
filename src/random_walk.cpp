@@ -149,19 +149,40 @@ double CRandomWalk::min_distance_to_obstacles(const sensor_msgs::msg::LaserScan 
 		double &angle_min_distance){
 	// consider only readings between angles -PI/2 and +PI/2
 	double angle_1st_reading = scan.angle_min + lidar_yaw_offset;
-	double k_floating = (-M_PI/2.0 - angle_1st_reading) / scan.angle_increment;
-	long unsigned int k = (unsigned long int) k_floating;
-	if ( ((double) k) != k_floating) ++k;
+	double i_floating = (-M_PI/2.0 - angle_1st_reading) / scan.angle_increment;
+
+	// i = round(i_floating) :
+	int i = (int) i_floating;
+	if (i >= 0 && ( ((double) i) != i_floating)) ++i;
+	else if (i < 0 && ( ((double) i) != i_floating)) --i;
+
+	if (i < 0) i+= ( (int) scan.ranges.size() );
+
+	long unsigned int k = (long unsigned int) i;
+
 	double angle = angle_1st_reading + k * scan.angle_increment;
+	if (angle >= M_PI) angle -= 2*M_PI;
+	if (angle < -M_PI) angle += 2*M_PI;
+
 	double min_dist = std::numeric_limits<double>::max();
 	angle_min_distance = angle;
 	double previous_range = min_dist;
+
+	// RCLCPP_DEBUG_STREAM(this->get_logger(),
+	// 	"angle_1st_reading = " << angle_1st_reading <<
+	// 	", i_floating = " << i_floating <<
+	// 	", i = " << i <<
+	// 	", angle0 = " << angle <<
+	// 	", k = " << k
+	// 	);
 
 	// constants to avoid outliers in laser scan
 	const double max_range_variation_within_cluster = 0.1;
 	const double epsilon = 0.05;
 
-	for (; k < scan.ranges.size() && angle <= M_PI/2.0; ++k){
+	while (angle <= M_PI/2.0){
+		if (k == scan.ranges.size()) k = 0;
+
 		if (!std::isnan(scan.ranges[k]) && scan.ranges[k] > epsilon &&
 			fabs(previous_range - scan.ranges[k]) < max_range_variation_within_cluster &&
 			min_dist > scan.ranges[k])
@@ -171,6 +192,8 @@ double CRandomWalk::min_distance_to_obstacles(const sensor_msgs::msg::LaserScan 
 		}
 		previous_range = scan.ranges[k];
 		angle += scan.angle_increment;
+
+		++k;
 	}
 
 	RCLCPP_DEBUG_STREAM(this->get_logger(),
