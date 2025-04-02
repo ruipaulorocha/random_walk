@@ -59,6 +59,7 @@ private:
 	int max_delta_yaw;
 	double lidar_yaw_offset;
 	bool stamped;
+	bool derivative_filter;
 
 	// other attributes
 	rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr twist_pub;
@@ -94,6 +95,7 @@ CRandomWalk::CRandomWalk(): Node("random_walk"){
 	this->declare_parameter("max_delta_yaw",		180);
 	this->declare_parameter("lidar_yaw_offset",		0.0);
 	this->declare_parameter("stamped",				false);
+	this->declare_parameter("derivative_filter",	true);
 
 	// get parameter values
 	linear_speed =			this->get_parameter("linear_speed").as_double();
@@ -104,6 +106,7 @@ CRandomWalk::CRandomWalk(): Node("random_walk"){
 	max_delta_yaw =			this->get_parameter("max_delta_yaw").as_int();
 	lidar_yaw_offset = 		this->get_parameter("lidar_yaw_offset").as_double();
 	stamped =				this->get_parameter("stamped").as_bool();
+	derivative_filter =		this->get_parameter("derivative_filter").as_bool();
 
 	if (alpha > 1.0) alpha = 1.0;
 	if (alpha < 0.0) alpha = 0.0;
@@ -184,7 +187,8 @@ double CRandomWalk::min_distance_to_obstacles(const sensor_msgs::msg::LaserScan 
 		if (k == scan.ranges.size()) k = 0;
 
 		if (!std::isnan(scan.ranges[k]) && scan.ranges[k] > epsilon &&
-			fabs(previous_range - scan.ranges[k]) < max_range_variation_within_cluster &&
+			(!derivative_filter ||
+				fabs(previous_range - scan.ranges[k]) < max_range_variation_within_cluster) &&
 			min_dist > scan.ranges[k])
 		{
 			min_dist = scan.ranges[k];
