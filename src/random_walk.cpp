@@ -70,10 +70,13 @@ private:
 	rclcpp::Time end_time;
 
 	// private methods
-	double min_distance_to_obstacles(const sensor_msgs::msg::LaserScan &scan,
+	//double min_distance_to_obstacles(const sensor_msgs::msg::LaserScan &scan,
+	//	double &angle_min_distance);
+	double min_distance_to_obstacles(const sensor_msgs::msg::LaserScan::SharedPtr msg,
 		double &angle_min_distance);
 	void publish_twist(const geometry_msgs::msg::Twist &);
-	void scan_callback(const sensor_msgs::msg::LaserScan &);
+	//void scan_callback(const sensor_msgs::msg::LaserScan &);
+	void scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr scan);
 	rclcpp::Duration motionTimePredict(double) const;
 
 	// static methods
@@ -148,8 +151,10 @@ CRandomWalk::CRandomWalk(): Node("random_walk"){
 }
 
 
-double CRandomWalk::min_distance_to_obstacles(const sensor_msgs::msg::LaserScan &scan,
+double CRandomWalk::min_distance_to_obstacles(const sensor_msgs::msg::LaserScan::SharedPtr msg,
 		double &angle_min_distance){
+	const sensor_msgs::msg::LaserScan scan = *msg;
+
 	// consider only readings between angles -PI/2 and +PI/2
 	double angle_1st_reading = scan.angle_min + lidar_yaw_offset;
 	double i_floating = (-M_PI/2.0 - angle_1st_reading) / scan.angle_increment;
@@ -207,7 +212,8 @@ double CRandomWalk::min_distance_to_obstacles(const sensor_msgs::msg::LaserScan 
 }
 
 
-void CRandomWalk::scan_callback(const sensor_msgs::msg::LaserScan &scan){
+//void CRandomWalk::scan_callback(const sensor_msgs::msg::LaserScan &scan){
+void CRandomWalk::scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr scan){
 	double angle_min_distance;
 	double min_dist;
 
